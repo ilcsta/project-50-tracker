@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project 50 — Road to Dec 31, 2026</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:        #f4f4f1;
+    --surface:      #fcfcfb;
+    --ink:          #0b0b0b;
+    --ink-2:        #52514e;
+    --muted:        #898781;
+    --border:       rgba(11,11,11,0.10);
+    --track:        rgba(11,11,11,0.07);
+    --accent:       #2a78d6;
+    --accent-2:     #1baf7a;
+    --good:         #0a7c0a;
+    --good-bg:      rgba(10,124,10,0.12);
+    --warn:         #a5720a;
+    --warn-bg:      rgba(250,178,25,0.16);
+    --crit:         #c0332f;
+    --crit-bg:      rgba(208,59,59,0.13);
+    --shadow:       0 1px 2px rgba(11,11,11,0.05), 0 12px 32px -12px rgba(11,11,11,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --plane:      #0c0c0c;
+      --surface:    #1a1a19;
+      --ink:        #ffffff;
+      --ink-2:      #c3c2b7;
+      --muted:      #8f8d87;
+      --border:     rgba(255,255,255,0.11);
+      --track:      rgba(255,255,255,0.09);
+      --accent:     #4f9bf0;
+      --accent-2:   #22c78c;
+      --good:       #35c635;
+      --good-bg:    rgba(53,198,53,0.14);
+      --warn:       #f5bd3f;
+      --warn-bg:    rgba(245,189,63,0.14);
+      --crit:       #f0605c;
+      --crit-bg:    rgba(240,96,92,0.14);
+      --shadow:     0 1px 2px rgba(0,0,0,0.4), 0 20px 44px -16px rgba(0,0,0,0.6);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--plane);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(16px, 4vw, 48px);
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header {
+    display: flex; flex-wrap: wrap; gap: 20px 32px;
+    align-items: flex-end; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .brand { display: flex; flex-direction: column; gap: 4px; }
+  .brand h1 { margin: 0; font-size: clamp(22px, 4vw, 30px); font-weight: 700; letter-spacing: -0.02em; }
+
+  .countdown { text-align: right; line-height: 1; }
+  .countdown .num {
+    font-size: clamp(40px, 9vw, 64px); font-weight: 800; letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(105deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .countdown .cap { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 6px; }
+
+  .timeline { margin-bottom: 28px; }
+  .timeline .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 7px; font-weight: 600; }
+  .timeline .track { height: 6px; border-radius: 999px; background: var(--track); overflow: hidden; }
+  .timeline .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .card h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .card .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.01em;
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .pill .g { font-size: 11px; }
+  .pill.good { color: var(--good); background: var(--good-bg); }
+  .pill.warn { color: var(--warn); background: var(--warn-bg); }
+  .pill.crit { color: var(--crit); background: var(--crit-bg); }
+
+  .big { display: flex; align-items: baseline; gap: 8px; }
+  .big .cur { font-size: 42px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .big .goal { font-size: 17px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .sub { font-size: 13px; color: var(--ink-2); margin-top: -6px; }
+  .sub b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .bar { position: relative; height: 12px; border-radius: 999px; background: var(--track); overflow: hidden; }
+  .bar .fill {
+    position: absolute; inset: 0 auto 0 0; height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width .6s cubic-bezier(.2,.7,.2,1);
+  }
+  .bar .mark {
+    position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--ink); opacity: 0.55; border-radius: 2px;
+  }
+  .barcap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-weight: 600; margin-top: -4px; }
+  .barcap b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+  .pace {
+    font-size: 12.5px; line-height: 1.55; color: var(--ink-2);
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .pace b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* ---- editor ---- */
+  .editor { margin-top: 18px; }
+  .editor .fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+  .editor label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    flex: 1 1 180px;
+  }
+  .editor input {
+    font: inherit; font-variant-numeric: tabular-nums;
+    padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--plane); color: var(--ink);
+    width: 100%;
+  }
+  .editor input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .editor button {
+    font: inherit; font-weight: 700; cursor: pointer;
+    padding: 10px 22px; border-radius: 10px; border: 0;
+    background: linear-gradient(105deg, var(--accent), var(--accent-2));
+    color: #fff; flex: 0 0 auto;
+  }
+  .editor button:disabled { opacity: 0.55; cursor: default; }
+  .save-msg { font-size: 12.5px; font-weight: 600; min-height: 1.2em; }
+  .save-msg.ok { color: var(--good); }
+  .save-msg.err { color: var(--crit); }
+
+  footer { margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background: var(--track); padding: 1px 5px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Project 50 Progress</h1>
+    </div>
+    <div class="countdown">
+      <div class="num" id="days-left">—</div>
+      <div class="cap">days remaining</div>
+    </div>
+  </header>
+
+  <div class="timeline">
+    <div class="row"><span id="tl-start">—</span><span id="tl-pct">—</span><span id="tl-end">—</span></div>
+    <div class="track"><div class="fill" id="tl-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <section class="card editor">
+    <h2>Update progress</h2>
+    <div class="fields">
+      <label>Client starts (current)
+        <input type="number" id="in-starts" step="1" min="0" inputmode="numeric">
+      </label>
+      <label>ABA hours / day (current)
+        <input type="number" id="in-hours" step="1" min="0" inputmode="decimal">
+      </label>
+      <button id="save-btn">Save</button>
+    </div>
+    <div class="save-msg" id="save-msg"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</div>
+
+<script>
+const DATA_URL = "data.json";
+const SAVE_URL = "/save";
+
+// Used only if data.json can't be fetched (e.g. opened as a file:// page).
+const FALLBACK = {
+  todayDate: "2026-09-02",
+  trackingStartDate: "2026-09-01",
+  deadline: "2026-12-31",
+  clientStarts:   { goal: 50,  current: 0,   atTrackingStart: 0 },
+  abaHoursPerDay: { goal: 871, current: 588, atTrackingStart: 588 }
+};
+
+const METRICS = [
+  { key: "clientStarts",   title: "New Client Starts", unit: "",     rateUnit: "/week",   dec: 0 },
+  { key: "abaHoursPerDay", title: "ABA Hours / Day",   unit: " hrs", rateUnit: " hrs/wk", dec: 0 }
+];
+
+const DAY = 86400000;
+const MIN_DAYS_FOR_PACE = 7; // ignore noisy projections until a baseline exists
+const d2 = s => new Date(s + "T00:00:00");
+const daysBetween = (a, b) => Math.round((d2(b) - d2(a)) / DAY);
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const fmt = (n, dec = 0) => n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const pct = x => Math.round(x * 100) + "%";
+const monthDay = s => d2(s).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+let currentData = null;
+let serverSave = true; // flipped off if data.json had to fall back
+
+async function loadData() {
+  try {
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return { data: await res.json(), ok: true };
+  } catch (e) {
+    return { data: FALLBACK, ok: false, err: e.message };
+  }
+}
+
+function paceCheck(cur, goal, base, daysElapsed, daysLeft) {
+  // Pace is measured on progress since tracking started, not total value.
+  const gained = cur - base;
+  const perDay = daysElapsed >= MIN_DAYS_FOR_PACE ? gained / daysElapsed : null;
+  const projected = perDay !== null ? cur + perDay * daysLeft : null;
+  const requiredPerDay = daysLeft > 0 ? (goal - cur) / daysLeft : null;
+
+  let status, label, glyph;
+  if (cur >= goal)                  { status = "good"; label = "Goal reached";     glyph = "✓"; }
+  else if (daysLeft <= 0)           { status = "crit"; label = "Deadline passed";  glyph = "!"; }
+  else if (perDay === null)         { status = "warn"; label = "Gathering data";   glyph = "·"; }
+  else if (projected >= goal)       { status = "good"; label = "On pace";          glyph = "▲"; }
+  else if (projected >= goal * 0.9) { status = "warn"; label = "Slightly behind";  glyph = "~"; }
+  else                             { status = "crit"; label = "Behind pace";      glyph = "▼"; }
+
+  return { perDay, projected, requiredPerDay, status, label, glyph };
+}
+
+function renderCard(cfg, data, timing) {
+  const m = data[cfg.key];
+  const base = m.atTrackingStart ?? 0;
+  const p = paceCheck(m.current, m.goal, base, timing.daysElapsed, timing.daysLeft);
+
+  // Progress = how much of the gap we set out to close is closed, not current / goal.
+  const gap = m.goal - base;
+  const progress = gap > 0 ? clamp01((m.current - base) / gap) : 0;
+  const expectedFrac = timing.total > 0 ? clamp01(timing.daysElapsed / timing.total) : 0;
+  const toGo = Math.max(0, m.goal - m.current);
+
+  let paceLine;
+  if (m.current >= m.goal) {
+    paceLine = "Goal hit — keep it there through Dec 31.";
+  } else if (p.perDay === null) {
+    paceLine = `Building a baseline — pace projection starts after ${MIN_DAYS_FOR_PACE} days of history (${timing.daysElapsed} so far).`;
+  } else if (p.perDay <= 0) {
+    paceLine = `No net progress since ${monthDay(data.trackingStartDate)}. Need <b>+${fmt(p.requiredPerDay * 7, 1)}${cfg.rateUnit}</b> to finish in time.`;
+  } else {
+    paceLine =
+      `Trending <b>+${fmt(p.perDay * 7, 1)}${cfg.rateUnit}</b> · need <b>+${fmt(p.requiredPerDay * 7, 1)}${cfg.rateUnit}</b>. ` +
+      `Projected by Dec 31: <b>${fmt(p.projected, cfg.dec)}</b>${cfg.unit} of ${fmt(m.goal, cfg.dec)}.`;
+  }
+
+  return `
+    <section class="card">
+      <div class="head">
+        <h2>${cfg.title}</h2>
+        <span class="pill ${p.status}"><span class="g">${p.glyph}</span>${p.label}</span>
+      </div>
+      <div class="big">
+        <span class="cur">${fmt(m.current, cfg.dec)}${cfg.unit}</span>
+        <span class="goal">/ ${fmt(m.goal, cfg.dec)}${cfg.unit}</span>
+      </div>
+      <div class="sub"><b>${pct(progress)}</b> to goal · <b>${fmt(toGo, cfg.dec)}</b> to go</div>
+      <div class="bar">
+        <div class="fill" style="width:${(progress * 100).toFixed(1)}%"></div>
+        <div class="mark" style="left:${(expectedFrac * 100).toFixed(1)}%" title="Pace-even mark"></div>
+      </div>
+      <div class="barcap"><span>now <b>${pct(progress)}</b></span><span>pace-even <b>${pct(expectedFrac)}</b></span></div>
+      <div class="pace">${paceLine}</div>
+    </section>`;
+}
+
+function render(data) {
+  currentData = data;
+  const today = data.todayDate;
+  const timing = {
+    daysElapsed: Math.max(0, daysBetween(data.trackingStartDate, today)),
+    daysLeft:    Math.max(0, daysBetween(today, data.deadline)),
+    total:       daysBetween(data.trackingStartDate, data.deadline)
+  };
+
+  document.getElementById("days-left").textContent = timing.daysLeft;
+
+  const yearFrac = timing.total > 0 ? clamp01(timing.daysElapsed / timing.total) : 0;
+  document.getElementById("tl-fill").style.width = (yearFrac * 100).toFixed(1) + "%";
+  document.getElementById("tl-pct").textContent = pct(yearFrac) + " of the window elapsed";
+  document.getElementById("tl-start").textContent = monthDay(data.trackingStartDate);
+  document.getElementById("tl-end").textContent = monthDay(data.deadline);
+
+  document.getElementById("grid").innerHTML =
+    METRICS.map(cfg => renderCard(cfg, data, timing)).join("");
+
+  document.getElementById("in-starts").value = data.clientStarts.current;
+  document.getElementById("in-hours").value = data.abaHoursPerDay.current;
+
+  document.getElementById("footer").innerHTML = serverSave
+    ? `Data as of ${monthDay(today)}, ${d2(today).getFullYear()} · saved to <code>data.json</code>`
+    : `Opened as a plain file — the dashboard is read-only. Run <code>python3 server.py</code> and open <code>localhost:8000</code> to edit.`;
+}
+
+async function save() {
+  const btn = document.getElementById("save-btn");
+  const msg = document.getElementById("save-msg");
+  const starts = Number(document.getElementById("in-starts").value);
+  const hours = Number(document.getElementById("in-hours").value);
+
+  if (!Number.isFinite(starts) || !Number.isFinite(hours) || starts < 0 || hours < 0) {
+    msg.className = "save-msg err";
+    msg.textContent = "Enter valid non-negative numbers.";
+    return;
+  }
+
+  btn.disabled = true;
+  msg.className = "save-msg";
+  msg.textContent = "Saving…";
+  try {
+    const res = await fetch(SAVE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientStarts: starts, abaHoursPerDay: hours })
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const updated = await res.json();
+    if (updated.error) throw new Error(updated.error);
+    render(updated);
+    msg.className = "save-msg ok";
+    msg.textContent = "Saved ✓  data.json updated.";
+  } catch (e) {
+    msg.className = "save-msg err";
+    msg.textContent = "Couldn't save (" + e.message + "). Start the server: python3 server.py";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("save-btn").addEventListener("click", save);
+
+loadData().then(({ data, ok }) => {
+  serverSave = ok;
+  render(data);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "todayDate": "2026-09-02",
+  "trackingStartDate": "2026-09-01",
+  "deadline": "2026-12-31",
+  "clientStarts": {
+    "goal": 50,
+    "current": 3,
+    "atTrackingStart": 0
+  },
+  "abaHoursPerDay": {
+    "goal": 871,
+    "current": 595,
+    "atTrackingStart": 588
+  }
+}
