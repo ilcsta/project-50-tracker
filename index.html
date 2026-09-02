@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Project 50 — Road to Dec 31, 2026</title>
+<title>Project 50 Progress</title>
 <style>
   :root {
     color-scheme: light;
@@ -157,6 +157,7 @@
   .save-msg.err { color: var(--crit); }
 
   footer { margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
+  footer b { color: var(--ink-2); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background: var(--track); padding: 1px 5px; border-radius: 5px; }
 </style>
 </head>
@@ -182,6 +183,9 @@
   <section class="card editor">
     <h2>Update progress</h2>
     <div class="fields">
+      <label>Your name
+        <input type="text" id="in-name" autocomplete="name" placeholder="Who's updating?">
+      </label>
       <label>Client starts (current)
         <input type="number" id="in-starts" step="1" min="0" inputmode="numeric">
       </label>
@@ -193,25 +197,23 @@
     <div class="save-msg" id="save-msg"></div>
   </section>
 
-  <footer id="footer"></footer>
+  <footer id="footer">Connecting to Supabase…</footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-const DATA_URL = "data.json";
-const SAVE_URL = "/save";
+// ---- Supabase data source ------------------------------------------------
+const SUPABASE_URL = "https://uifijwlbgxildyhqstki.supabase.co";
+const SUPABASE_KEY = "sb_publishable_tUxmvr880TAMZVoEFBJ0JQ_4oTPtQ_b";
+const ROW_ID = "main";               // progress row: id = 'main', JSON in column "data"
+const NAME_STORE = "p50-updater-name";
 
-// Used only if data.json can't be fetched (e.g. opened as a file:// page).
-const FALLBACK = {
-  todayDate: "2026-09-02",
-  trackingStartDate: "2026-09-01",
-  deadline: "2026-12-31",
-  clientStarts:   { goal: 50,  current: 0,   atTrackingStart: 0 },
-  abaHoursPerDay: { goal: 871, current: 588, atTrackingStart: 588 }
-};
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// key = property name inside the "data" JSON blob
 const METRICS = [
-  { key: "clientStarts",   title: "New Client Starts", unit: "",     rateUnit: "/week",   dec: 0 },
-  { key: "abaHoursPerDay", title: "ABA Hours / Day",   unit: " hrs", rateUnit: " hrs/wk", dec: 0 }
+  { key: "clientStarts", title: "New Client Starts", unit: "",     rateUnit: "/week",   dec: 0 },
+  { key: "abaHours",     title: "ABA Hours / Day",   unit: " hrs", rateUnit: " hrs/wk", dec: 0 }
 ];
 
 const DAY = 86400000;
@@ -222,20 +224,15 @@ const clamp01 = x => Math.max(0, Math.min(1, x));
 const fmt = (n, dec = 0) => n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const pct = x => Math.round(x * 100) + "%";
 const monthDay = s => d2(s).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const todayStr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+};
 
 let currentData = null;
-let serverSave = true; // flipped off if data.json had to fall back
 
-async function loadData() {
-  try {
-    const res = await fetch(DATA_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return { data: await res.json(), ok: true };
-  } catch (e) {
-    return { data: FALLBACK, ok: false, err: e.message };
-  }
-}
-
+// ---- pace / gap-closure math (unchanged) --------------------------------
 function paceCheck(cur, goal, base, daysElapsed, daysLeft) {
   // Pace is measured on progress since tracking started, not total value.
   const gained = cur - base;
@@ -300,7 +297,7 @@ function renderCard(cfg, data, timing) {
 
 function render(data) {
   currentData = data;
-  const today = data.todayDate;
+  const today = todayStr();
   const timing = {
     daysElapsed: Math.max(0, daysBetween(data.trackingStartDate, today)),
     daysLeft:    Math.max(0, daysBetween(today, data.deadline)),
@@ -319,16 +316,28 @@ function render(data) {
     METRICS.map(cfg => renderCard(cfg, data, timing)).join("");
 
   document.getElementById("in-starts").value = data.clientStarts.current;
-  document.getElementById("in-hours").value = data.abaHoursPerDay.current;
+  document.getElementById("in-hours").value = data.abaHours.current;
 
-  document.getElementById("footer").innerHTML = serverSave
-    ? `Data as of ${monthDay(today)}, ${d2(today).getFullYear()} · saved to <code>data.json</code>`
-    : `Opened as a plain file — the dashboard is read-only. Run <code>python3 server.py</code> and open <code>localhost:8000</code> to edit.`;
+  const when = data.lastUpdatedAt ? new Date(data.lastUpdatedAt) : null;
+  document.getElementById("footer").innerHTML = when
+    ? `Last updated by <b>${esc(data.lastUpdatedBy || "—")}</b> · ` +
+      `${when.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}, ` +
+      `${when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · live from Supabase`
+    : "Live from Supabase";
+}
+
+// ---- data source: fetch + save ----------------------------------------
+async function loadData() {
+  const { data, error } = await db.from("progress").select("data").eq("id", ROW_ID).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`No “${ROW_ID}” row in the progress table — run supabase-setup.sql.`);
+  return data.data;
 }
 
 async function save() {
   const btn = document.getElementById("save-btn");
   const msg = document.getElementById("save-msg");
+  const name = document.getElementById("in-name").value.trim();
   const starts = Number(document.getElementById("in-starts").value);
   const hours = Number(document.getElementById("in-hours").value);
 
@@ -337,36 +346,53 @@ async function save() {
     msg.textContent = "Enter valid non-negative numbers.";
     return;
   }
+  if (!currentData) {
+    msg.className = "save-msg err";
+    msg.textContent = "Data hasn't loaded yet — refresh and try again.";
+    return;
+  }
+
+  try { localStorage.setItem(NAME_STORE, name); } catch (e) { /* private mode */ }
 
   btn.disabled = true;
   msg.className = "save-msg";
   msg.textContent = "Saving…";
   try {
-    const res = await fetch(SAVE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientStarts: starts, abaHoursPerDay: hours })
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const updated = await res.json();
-    if (updated.error) throw new Error(updated.error);
-    render(updated);
+    const next = {
+      ...currentData,
+      clientStarts: { ...currentData.clientStarts, current: starts },
+      abaHours:      { ...currentData.abaHours,      current: hours },
+      lastUpdatedBy: name || "anonymous",
+      lastUpdatedAt: new Date().toISOString()
+    };
+
+    const { error } = await db.from("progress").update({ data: next }).eq("id", ROW_ID);
+    if (error) throw new Error(error.message);
+
+    render(await loadData()); // refetch so everyone sees the same live numbers
     msg.className = "save-msg ok";
-    msg.textContent = "Saved ✓  data.json updated.";
+    msg.textContent = "Saved ✓  Live for everyone.";
   } catch (e) {
     msg.className = "save-msg err";
-    msg.textContent = "Couldn't save (" + e.message + "). Start the server: python3 server.py";
+    msg.textContent = "Couldn't save (" + e.message + ").";
   } finally {
     btn.disabled = false;
   }
 }
 
+// ---- boot -----------------------------------------------------------------
 document.getElementById("save-btn").addEventListener("click", save);
+try {
+  const saved = localStorage.getItem(NAME_STORE);
+  if (saved) document.getElementById("in-name").value = saved;
+} catch (e) { /* private mode */ }
 
-loadData().then(({ data, ok }) => {
-  serverSave = ok;
-  render(data);
-});
+loadData()
+  .then(render)
+  .catch(e => {
+    document.getElementById("footer").innerHTML =
+      `<span class="save-msg err">Couldn't load data: ${esc(e.message)}</span>`;
+  });
 </script>
 </body>
 </html>
