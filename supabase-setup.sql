@@ -26,15 +26,35 @@ create policy "progress public update"
   with check (true);
 
 -- Seed the shared row the dashboard reads (id = 'main').
+-- Client-starts count and ABA hours/day are DERIVED by the dashboard, counting
+-- only entries where "removed" is not true (removals are soft — kept for audit):
+--   clientStarts.current = count(newStarts where not removed)
+--   abaHours.current      = abaHours.atTrackingStart
+--                           + sum(newStarts.hours where not removed)
+--                           + sum(adjustments.delta where not removed)
+-- so only the baseline, the goal and the two rosters are stored.
 insert into public.progress (id, data) values (
   'main',
   jsonb_build_object(
     'trackingStartDate', '2026-09-01',
     'deadline',          '2026-12-31',
-    'clientStarts', jsonb_build_object('goal', 50,  'current', 0,   'atTrackingStart', 0),
-    'abaHours',     jsonb_build_object('goal', 871, 'current', 588, 'atTrackingStart', 588),
+    'clientStarts', jsonb_build_object('goal', 50,  'atTrackingStart', 0),
+    'abaHours',     jsonb_build_object('goal', 871, 'atTrackingStart', 588),
+    'newStarts',   jsonb_build_array(),   -- [{ code, hours, dateAdded, addedBy, removed?, removedBy?, removedAt? }]
+    'adjustments', jsonb_build_array(),   -- [{ code, delta, date, addedBy, removed?, removedBy?, removedAt? }]
     'lastUpdatedBy', 'seed',
     'lastUpdatedAt', '2026-09-02T00:00:00Z'
   )
 )
 on conflict (id) do nothing;
+
+-- Migration for an existing 'main' row from the old (single-number) model:
+-- resets the rosters to empty and drops the stored current values.
+update public.progress
+set data = (data - 'clientStarts' - 'abaHours') || jsonb_build_object(
+  'clientStarts', jsonb_build_object('goal', 50,  'atTrackingStart', 0),
+  'abaHours',     jsonb_build_object('goal', 871, 'atTrackingStart', 588),
+  'newStarts',    jsonb_build_array(),
+  'adjustments',  jsonb_build_array()
+)
+where id = 'main';

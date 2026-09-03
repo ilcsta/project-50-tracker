@@ -156,6 +156,92 @@
   .save-msg.ok { color: var(--good); }
   .save-msg.err { color: var(--crit); }
 
+  .forms { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  @media (max-width: 620px) { .forms { grid-template-columns: 1fr; } }
+  .forms .editor { margin-top: 0; }
+  .editor .hint { font-size: 12px; color: var(--muted); margin: -4px 0 0; }
+
+  /* ---- rosters ---- */
+  .roster { margin-top: 18px; gap: 12px; }
+  .roster > summary {
+    list-style: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .roster > summary::-webkit-details-marker { display: none; }
+  .roster > summary h2 { margin: 0; }
+  .roster > summary::after { content: "▸ show"; font-size: 12px; font-weight: 700; color: var(--muted); }
+  .roster[open] > summary::after { content: "▾ hide"; }
+  .roster .count { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .filter {
+    font: inherit; width: 100%;
+    padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--plane); color: var(--ink);
+    margin-top: 12px;
+  }
+  .filter:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .listwrap {
+    margin-top: 12px; max-height: 280px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 12px;
+  }
+  .listwrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .listwrap th, .listwrap td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .listwrap th {
+    position: sticky; top: 0; background: var(--surface);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+  }
+  .listwrap td { font-variant-numeric: tabular-nums; }
+  .listwrap tbody tr:last-child td { border-bottom: 0; }
+  .listwrap .delta-pos { color: var(--good); font-weight: 700; }
+  .listwrap .delta-neg { color: var(--crit); font-weight: 700; }
+  .empty { font-size: 13px; color: var(--muted); padding: 16px 14px; margin: 0; }
+
+  .listwrap .rm-link {
+    font: inherit; font-size: 12px; font-weight: 700;
+    color: var(--crit); background: none; border: 0; padding: 0; cursor: pointer;
+  }
+  .listwrap .rm-link:hover { text-decoration: underline; }
+  .listwrap tr.removed td { color: var(--muted); text-decoration: line-through; }
+  .listwrap tr.removed td code { text-decoration: line-through; opacity: 0.7; }
+  .listwrap tr.rm-note td {
+    text-decoration: none; color: var(--muted);
+    font-size: 11px; padding-top: 0; white-space: normal;
+  }
+
+  /* ---- remove-confirm modal ---- */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.45); padding: 20px;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow); padding: 22px;
+    width: 100%; max-width: 400px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .modal h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .modal .detail { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .modal .detail b { color: var(--ink); }
+  .modal label {
+    display: flex; flex-direction: column; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+  }
+  .modal input {
+    font: inherit; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--plane); color: var(--ink);
+  }
+  .modal input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .modal .actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal .actions button {
+    font: inherit; font-weight: 700; cursor: pointer;
+    padding: 9px 18px; border-radius: 10px; border: 0;
+  }
+  .modal .actions .cancel { background: var(--track); color: var(--ink); }
+  .modal .actions .confirm { background: var(--crit); color: #fff; }
+  .modal .actions button:disabled { opacity: 0.55; cursor: default; }
+
   footer { margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
   footer b { color: var(--ink-2); }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; background: var(--track); padding: 1px 5px; border-radius: 5px; }
@@ -180,24 +266,74 @@
 
   <div class="grid" id="grid"></div>
 
-  <section class="card editor">
-    <h2>Update progress</h2>
-    <div class="fields">
-      <label>Your name
-        <input type="text" id="in-name" autocomplete="name" placeholder="Who's updating?">
-      </label>
-      <label>Client starts (current)
-        <input type="number" id="in-starts" step="1" min="0" inputmode="numeric">
-      </label>
-      <label>ABA hours / day (current)
-        <input type="number" id="in-hours" step="1" min="0" inputmode="decimal">
-      </label>
-      <button id="save-btn">Save</button>
+  <div class="forms">
+    <section class="card editor">
+      <h2>Add new client start</h2>
+      <p class="hint">A client who joined the caseload after tracking began.</p>
+      <div class="fields">
+        <label>Client code
+          <input type="text" id="ns-code" placeholder="e.g. JoSm" autocomplete="off" autocapitalize="off">
+        </label>
+        <label>Hours / day
+          <input type="number" id="ns-hours" step="0.25" min="0" inputmode="decimal" placeholder="e.g. 6">
+        </label>
+        <label>Your name
+          <input type="text" id="ns-name" autocomplete="name" placeholder="Who's adding?">
+        </label>
+        <button id="ns-btn">Add start</button>
+      </div>
+      <div class="save-msg" id="ns-msg"></div>
+    </section>
+
+    <section class="card editor">
+      <h2>Adjust existing client hours</h2>
+      <p class="hint">An hours change for a client already on caseload before tracking began.</p>
+      <div class="fields">
+        <label>Client code
+          <input type="text" id="adj-code" placeholder="e.g. AlBr" autocomplete="off" autocapitalize="off">
+        </label>
+        <label>Hours change
+          <input type="text" id="adj-delta" inputmode="text" placeholder="e.g. +1 or -5">
+        </label>
+        <label>Your name
+          <input type="text" id="adj-name" autocomplete="name" placeholder="Who's adjusting?">
+        </label>
+        <button id="adj-btn">Log adjustment</button>
+      </div>
+      <div class="save-msg" id="adj-msg"></div>
+    </section>
+  </div>
+
+  <section class="card roster">
+    <div class="head">
+      <h2>New client starts <span class="count" id="ns-list-count"></span></h2>
     </div>
-    <div class="save-msg" id="save-msg"></div>
+    <input type="text" class="filter" id="ns-filter" placeholder="Search by client code or name…" autocomplete="off">
+    <div class="listwrap" id="ns-list"></div>
   </section>
 
+  <details class="card roster" id="adj-roster">
+    <summary><h2>Adjustments log <span class="count" id="adj-list-count"></span></h2></summary>
+    <input type="text" class="filter" id="adj-filter" placeholder="Search by client code or name…" autocomplete="off">
+    <div class="listwrap" id="adj-list"></div>
+  </details>
+
   <footer id="footer">Connecting to Supabase…</footer>
+</div>
+
+<div class="modal-backdrop" id="rm-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rm-title">
+    <h3 id="rm-title">Remove entry</h3>
+    <p class="detail" id="rm-detail"></p>
+    <label>Your name
+      <input type="text" id="rm-name" autocomplete="name" placeholder="Required to confirm">
+    </label>
+    <div class="save-msg" id="rm-msg"></div>
+    <div class="actions">
+      <button type="button" class="cancel" id="rm-cancel">Cancel</button>
+      <button type="button" class="confirm" id="rm-confirm">Remove</button>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -224,6 +360,12 @@ const clamp01 = x => Math.max(0, Math.min(1, x));
 const fmt = (n, dec = 0) => n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const pct = x => Math.round(x * 100) + "%";
 const monthDay = s => d2(s).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const fmtDateTime = iso => {
+  const dt = new Date(iso);
+  if (isNaN(dt)) return String(iso ?? "—");
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+    ", " + dt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+};
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const todayStr = () => {
   const n = new Date();
@@ -231,6 +373,19 @@ const todayStr = () => {
 };
 
 let currentData = null;
+
+// ---- computed metrics (derived, never stored) --------------------------
+const isActive = e => e.removed !== true;
+const sum = (arr, f) => (arr || []).reduce((t, x) => t + (Number(f(x)) || 0), 0);
+
+function computeCurrent(data) {
+  const starts = (data.newStarts || []).filter(isActive);
+  const adjustments = (data.adjustments || []).filter(isActive);
+  return {
+    clientStarts: starts.length,
+    abaHours: (data.abaHours.atTrackingStart ?? 0) + sum(starts, e => e.hours) + sum(adjustments, e => e.delta)
+  };
+}
 
 // ---- pace / gap-closure math (unchanged) --------------------------------
 function paceCheck(cur, goal, base, daysElapsed, daysLeft) {
@@ -297,6 +452,9 @@ function renderCard(cfg, data, timing) {
 
 function render(data) {
   currentData = data;
+  data.newStarts = data.newStarts || [];
+  data.adjustments = data.adjustments || [];
+
   const today = todayStr();
   const timing = {
     daysElapsed: Math.max(0, daysBetween(data.trackingStartDate, today)),
@@ -312,11 +470,18 @@ function render(data) {
   document.getElementById("tl-start").textContent = monthDay(data.trackingStartDate);
   document.getElementById("tl-end").textContent = monthDay(data.deadline);
 
+  // Cards run off derived values; the stored blob only holds the roster + baseline.
+  const cur = computeCurrent(data);
+  const view = {
+    ...data,
+    clientStarts: { ...data.clientStarts, current: cur.clientStarts },
+    abaHours:     { ...data.abaHours,     current: cur.abaHours }
+  };
   document.getElementById("grid").innerHTML =
-    METRICS.map(cfg => renderCard(cfg, data, timing)).join("");
+    METRICS.map(cfg => renderCard(cfg, view, timing)).join("");
 
-  document.getElementById("in-starts").value = data.clientStarts.current;
-  document.getElementById("in-hours").value = data.abaHours.current;
+  renderStartsList(data);
+  renderAdjustmentsList(data);
 
   const when = data.lastUpdatedAt ? new Date(data.lastUpdatedAt) : null;
   document.getElementById("footer").innerHTML = when
@@ -324,6 +489,89 @@ function render(data) {
       `${when.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}, ` +
       `${when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · live from Supabase`
     : "Live from Supabase";
+}
+
+// ---- roster lists -------------------------------------------------------
+function matches(entry, q) {
+  if (!q) return true;
+  return `${entry.code || ""} ${entry.addedBy || ""}`.toLowerCase().includes(q);
+}
+
+// Each entry is identified by its creation timestamp (unique per click).
+const entryKey = (r, kind) => kind === "start" ? r.dateAdded : r.date;
+function findEntry(data, kind, key) {
+  const arr = kind === "start" ? (data.newStarts || []) : (data.adjustments || []);
+  return arr.find(e => entryKey(e, kind) === key);
+}
+
+function signed(n, dec = 2) {
+  const v = Number(n) || 0;
+  return (v >= 0 ? "+" : "−") + fmt(Math.abs(v), dec);
+}
+
+function rowHtml(r, kind) {
+  const removed = r.removed === true;
+  const key = esc(entryKey(r, kind));
+  let cells;
+  if (kind === "start") {
+    cells =
+      `<td><code>${esc(r.code)}</code></td>` +
+      `<td>${fmt(Number(r.hours) || 0, 2)}</td>` +
+      `<td>${esc(fmtDateTime(r.dateAdded))}</td>` +
+      `<td>${esc(r.addedBy || "—")}</td>`;
+  } else {
+    const d = Number(r.delta) || 0;
+    const cls = removed ? "" : (d >= 0 ? "delta-pos" : "delta-neg");
+    cells =
+      `<td><code>${esc(r.code)}</code></td>` +
+      `<td class="${cls}">${signed(d)}</td>` +
+      `<td>${esc(fmtDateTime(r.date))}</td>` +
+      `<td>${esc(r.addedBy || "—")}</td>`;
+  }
+  const action = removed
+    ? `<td></td>`
+    : `<td><button type="button" class="rm-link" data-kind="${kind}" data-key="${key}">Remove</button></td>`;
+  const note = removed
+    ? `<tr class="rm-note"><td colspan="5">↳ removed by ${esc(r.removedBy || "—")}, ${esc(fmtDateTime(r.removedAt))}</td></tr>`
+    : "";
+  return `<tr class="${removed ? "removed" : ""}">${cells}${action}</tr>${note}`;
+}
+
+function renderList({ data, arrKey, kind, filterId, countId, listId, emptyMsg, dateField, headCols }) {
+  const rows = (data[arrKey] || []).slice()
+    .sort((a, b) => new Date(b[dateField]) - new Date(a[dateField]));
+  const q = (document.getElementById(filterId).value || "").trim().toLowerCase();
+  const shown = rows.filter(r => matches(r, q));
+  const active = rows.filter(isActive).length;
+  document.getElementById(countId).textContent =
+    active === rows.length ? `(${rows.length})` : `(${active} active · ${rows.length} total)`;
+
+  const wrap = document.getElementById(listId);
+  if (!rows.length) { wrap.innerHTML = `<p class="empty">${emptyMsg}</p>`; return; }
+  if (!shown.length) { wrap.innerHTML = `<p class="empty">No entries match “${esc(q)}”.</p>`; return; }
+
+  wrap.innerHTML =
+    `<table><thead><tr>${headCols.map(c => `<th>${c}</th>`).join("")}<th></th></tr></thead><tbody>` +
+    shown.map(r => rowHtml(r, kind)).join("") +
+    `</tbody></table>`;
+}
+
+function renderStartsList(data) {
+  renderList({
+    data, arrKey: "newStarts", kind: "start",
+    filterId: "ns-filter", countId: "ns-list-count", listId: "ns-list",
+    emptyMsg: "No new client starts logged yet.", dateField: "dateAdded",
+    headCols: ["Code", "Hrs/day", "Date added", "Added by"]
+  });
+}
+
+function renderAdjustmentsList(data) {
+  renderList({
+    data, arrKey: "adjustments", kind: "adj",
+    filterId: "adj-filter", countId: "adj-list-count", listId: "adj-list",
+    emptyMsg: "No adjustments logged yet.", dateField: "date",
+    headCols: ["Code", "Change", "Date", "Added by"]
+  });
 }
 
 // ---- data source: fetch + save ----------------------------------------
@@ -334,37 +582,28 @@ async function loadData() {
   return data.data;
 }
 
-async function save() {
-  const btn = document.getElementById("save-btn");
-  const msg = document.getElementById("save-msg");
-  const name = document.getElementById("in-name").value.trim();
-  const starts = Number(document.getElementById("in-starts").value);
-  const hours = Number(document.getElementById("in-hours").value);
+function rememberName(name) {
+  try { localStorage.setItem(NAME_STORE, name); } catch (e) { /* private mode */ }
+}
 
-  if (!Number.isFinite(starts) || !Number.isFinite(hours) || starts < 0 || hours < 0) {
-    msg.className = "save-msg err";
-    msg.textContent = "Enter valid non-negative numbers.";
-    return;
-  }
+// Apply a mutation to a fresh copy of the loaded blob, persist, refetch, re-render.
+async function commit(mutate, btn, msg) {
   if (!currentData) {
     msg.className = "save-msg err";
     msg.textContent = "Data hasn't loaded yet — refresh and try again.";
-    return;
+    return false;
   }
-
-  try { localStorage.setItem(NAME_STORE, name); } catch (e) { /* private mode */ }
-
   btn.disabled = true;
   msg.className = "save-msg";
   msg.textContent = "Saving…";
   try {
-    const next = {
-      ...currentData,
-      clientStarts: { ...currentData.clientStarts, current: starts },
-      abaHours:      { ...currentData.abaHours,      current: hours },
-      lastUpdatedBy: name || "anonymous",
-      lastUpdatedAt: new Date().toISOString()
-    };
+    const next = JSON.parse(JSON.stringify(currentData));
+    next.newStarts = next.newStarts || [];
+    next.adjustments = next.adjustments || [];
+    if (next.clientStarts) delete next.clientStarts.current; // derived now, don't persist
+    if (next.abaHours) delete next.abaHours.current;
+    mutate(next);
+    next.lastUpdatedAt = new Date().toISOString();
 
     const { error } = await db.from("progress").update({ data: next }).eq("id", ROW_ID);
     if (error) throw new Error(error.message);
@@ -372,19 +611,166 @@ async function save() {
     render(await loadData()); // refetch so everyone sees the same live numbers
     msg.className = "save-msg ok";
     msg.textContent = "Saved ✓  Live for everyone.";
+    return true;
   } catch (e) {
     msg.className = "save-msg err";
     msg.textContent = "Couldn't save (" + e.message + ").";
+    return false;
   } finally {
     btn.disabled = false;
   }
 }
 
+async function addNewStart() {
+  const btn = document.getElementById("ns-btn");
+  const msg = document.getElementById("ns-msg");
+  const codeEl = document.getElementById("ns-code");
+  const hoursEl = document.getElementById("ns-hours");
+  const code = codeEl.value.trim();
+  const hours = Number(hoursEl.value);
+  const name = document.getElementById("ns-name").value.trim();
+
+  if (!code) { msg.className = "save-msg err"; msg.textContent = "Enter a client code."; return; }
+  if (!Number.isFinite(hours) || hours <= 0) {
+    msg.className = "save-msg err";
+    msg.textContent = "Enter valid hours / day (greater than 0).";
+    return;
+  }
+  const dup = (currentData?.newStarts || []).find(
+    e => isActive(e) && (e.code || "").toLowerCase() === code.toLowerCase()
+  );
+  if (dup && !confirm(`“${dup.code}” is already an active start (added ${fmtDateTime(dup.dateAdded)} by ${dup.addedBy || "—"}).\nAdd another entry anyway?`)) return;
+
+  rememberName(name);
+  const ok = await commit(next => {
+    next.newStarts.push({
+      code,
+      hours,
+      dateAdded: new Date().toISOString(),
+      addedBy: name || "anonymous"
+    });
+    next.lastUpdatedBy = name || "anonymous";
+  }, btn, msg);
+
+  if (ok) { codeEl.value = ""; hoursEl.value = ""; codeEl.focus(); }
+}
+
+async function addAdjustment() {
+  const btn = document.getElementById("adj-btn");
+  const msg = document.getElementById("adj-msg");
+  const codeEl = document.getElementById("adj-code");
+  const deltaEl = document.getElementById("adj-delta");
+  const code = codeEl.value.trim();
+  const raw = deltaEl.value.trim().replace(/^\+/, "");
+  const delta = Number(raw);
+  const name = document.getElementById("adj-name").value.trim();
+
+  if (!code) { msg.className = "save-msg err"; msg.textContent = "Enter a client code."; return; }
+  if (!raw || !Number.isFinite(delta) || delta === 0) {
+    msg.className = "save-msg err";
+    msg.textContent = "Enter an hours change like +1 or -5.";
+    return;
+  }
+
+  rememberName(name);
+  const ok = await commit(next => {
+    next.adjustments.push({
+      code,
+      delta,
+      date: new Date().toISOString(),
+      addedBy: name || "anonymous"
+    });
+    next.lastUpdatedBy = name || "anonymous";
+  }, btn, msg);
+
+  if (ok) { codeEl.value = ""; deltaEl.value = ""; codeEl.focus(); }
+}
+
+// ---- soft-delete (remove) --------------------------------------------
+let pendingRemoval = null;
+const shortDate = iso => {
+  const dt = new Date(iso);
+  return isNaN(dt) ? String(iso ?? "—") : dt.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+};
+
+function onRemoveClick(e) {
+  const btn = e.target.closest(".rm-link");
+  if (!btn) return;
+  openRemoveModal(btn.dataset.kind, btn.dataset.key);
+}
+
+function openRemoveModal(kind, key) {
+  const entry = findEntry(currentData || {}, kind, key);
+  if (!entry) return;
+  pendingRemoval = { kind, key };
+
+  const detail = kind === "start"
+    ? `Remove <b>${esc(entry.code)}</b>, ${fmt(Number(entry.hours) || 0, 2)} hrs/day, added ${esc(shortDate(entry.dateAdded))}?`
+    : `Remove adjustment for <b>${esc(entry.code)}</b>, ${signed(entry.delta)} hrs, logged ${esc(shortDate(entry.date))}?`;
+  document.getElementById("rm-detail").innerHTML = detail + " This keeps it in the log for audit, marked removed.";
+
+  const nameEl = document.getElementById("rm-name");
+  try { nameEl.value = localStorage.getItem(NAME_STORE) || ""; } catch (e) { nameEl.value = ""; }
+  const msg = document.getElementById("rm-msg");
+  msg.className = "save-msg";
+  msg.textContent = "";
+  document.getElementById("rm-modal").hidden = false;
+  nameEl.focus();
+}
+
+function closeRemoveModal() {
+  pendingRemoval = null;
+  document.getElementById("rm-modal").hidden = true;
+}
+
+async function confirmRemoval() {
+  if (!pendingRemoval) return;
+  const { kind, key } = pendingRemoval;
+  const msg = document.getElementById("rm-msg");
+  const btn = document.getElementById("rm-confirm");
+  const name = document.getElementById("rm-name").value.trim();
+
+  if (!name) {
+    msg.className = "save-msg err";
+    msg.textContent = "Enter your name to confirm.";
+    return;
+  }
+  rememberName(name);
+
+  const ok = await commit(next => {
+    const entry = findEntry(next, kind, key);
+    if (!entry) throw new Error("entry no longer exists — refresh");
+    entry.removed = true;
+    entry.removedBy = name;
+    entry.removedAt = new Date().toISOString();
+    next.lastUpdatedBy = name;
+  }, btn, msg);
+
+  if (ok) closeRemoveModal();
+}
+
 // ---- boot -----------------------------------------------------------------
-document.getElementById("save-btn").addEventListener("click", save);
+document.getElementById("ns-btn").addEventListener("click", addNewStart);
+document.getElementById("adj-btn").addEventListener("click", addAdjustment);
+document.getElementById("ns-filter").addEventListener("input", () => currentData && renderStartsList(currentData));
+document.getElementById("adj-filter").addEventListener("input", () => currentData && renderAdjustmentsList(currentData));
+document.getElementById("ns-list").addEventListener("click", onRemoveClick);
+document.getElementById("adj-list").addEventListener("click", onRemoveClick);
+document.getElementById("rm-cancel").addEventListener("click", closeRemoveModal);
+document.getElementById("rm-confirm").addEventListener("click", confirmRemoval);
+document.getElementById("rm-modal").addEventListener("click", e => {
+  if (e.target === document.getElementById("rm-modal")) closeRemoveModal();
+});
+document.getElementById("rm-name").addEventListener("keydown", e => { if (e.key === "Enter") confirmRemoval(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !document.getElementById("rm-modal").hidden) closeRemoveModal();
+});
 try {
   const saved = localStorage.getItem(NAME_STORE);
-  if (saved) document.getElementById("in-name").value = saved;
+  if (saved) {
+    document.getElementById("ns-name").value = saved;
+    document.getElementById("adj-name").value = saved;
+  }
 } catch (e) { /* private mode */ }
 
 loadData()
