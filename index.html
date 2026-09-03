@@ -144,6 +144,13 @@
     border: 1px solid var(--border); background: var(--plane); color: var(--ink);
     width: 100%;
   }
+  .editor select {
+    font: inherit;
+    padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--plane); color: var(--ink);
+    width: 100%;
+  }
+  .editor select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .editor input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .editor button {
     font: inherit; font-weight: 700; cursor: pointer;
@@ -180,7 +187,7 @@
   }
   .filter:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   .listwrap {
-    margin-top: 12px; max-height: 280px; overflow-y: auto;
+    margin-top: 12px; max-height: 280px; overflow: auto;
     border: 1px solid var(--border); border-radius: 12px;
   }
   .listwrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -195,14 +202,17 @@
   .listwrap .delta-neg { color: var(--crit); font-weight: 700; }
   .empty { font-size: 13px; color: var(--muted); padding: 16px 14px; margin: 0; }
 
-  .listwrap .rm-link {
+  .listwrap .row-actions { display: flex; gap: 12px; }
+  .listwrap .rm-link, .listwrap .edit-link {
     font: inherit; font-size: 12px; font-weight: 700;
-    color: var(--crit); background: none; border: 0; padding: 0; cursor: pointer;
+    background: none; border: 0; padding: 0; cursor: pointer;
   }
-  .listwrap .rm-link:hover { text-decoration: underline; }
+  .listwrap .rm-link { color: var(--crit); }
+  .listwrap .edit-link { color: var(--accent); }
+  .listwrap .rm-link:hover, .listwrap .edit-link:hover { text-decoration: underline; }
   .listwrap tr.removed td { color: var(--muted); text-decoration: line-through; }
   .listwrap tr.removed td code { text-decoration: line-through; opacity: 0.7; }
-  .listwrap tr.rm-note td {
+  .listwrap tr.note td {
     text-decoration: none; color: var(--muted);
     font-size: 11px; padding-top: 0; white-space: normal;
   }
@@ -228,11 +238,12 @@
     display: flex; flex-direction: column; gap: 6px;
     font-size: 12px; font-weight: 600; color: var(--muted);
   }
-  .modal input {
+  .modal input, .modal select {
     font: inherit; padding: 10px 12px; border-radius: 10px;
     border: 1px solid var(--border); background: var(--plane); color: var(--ink);
   }
-  .modal input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .modal input:focus, .modal select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .modal .actions .save { background: linear-gradient(105deg, var(--accent), var(--accent-2)); color: #fff; }
   .modal .actions { display: flex; gap: 10px; justify-content: flex-end; }
   .modal .actions button {
     font: inherit; font-weight: 700; cursor: pointer;
@@ -276,6 +287,14 @@
         </label>
         <label>Hours / day
           <input type="number" id="ns-hours" step="0.25" min="0" inputmode="decimal" placeholder="e.g. 6">
+        </label>
+        <label>Clinic
+          <select id="ns-clinic">
+            <option value="" disabled selected>Select clinic…</option>
+          </select>
+        </label>
+        <label>Start date
+          <input type="date" id="ns-startdate">
         </label>
         <label>Your name
           <input type="text" id="ns-name" autocomplete="name" placeholder="Who's adding?">
@@ -336,6 +355,32 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="ed-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ed-title">
+    <h3 id="ed-title">Edit client start</h3>
+    <label>Client code
+      <input type="text" id="ed-code" autocomplete="off" autocapitalize="off">
+    </label>
+    <label>Hours / day
+      <input type="number" id="ed-hours" step="0.25" min="0" inputmode="decimal">
+    </label>
+    <label>Clinic
+      <select id="ed-clinic"></select>
+    </label>
+    <label>Start date
+      <input type="date" id="ed-startdate">
+    </label>
+    <label>Your name
+      <input type="text" id="ed-name" autocomplete="name" placeholder="Required to save">
+    </label>
+    <div class="save-msg" id="ed-msg"></div>
+    <div class="actions">
+      <button type="button" class="cancel" id="ed-cancel">Cancel</button>
+      <button type="button" class="save" id="ed-save">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 // ---- Supabase data source ------------------------------------------------
@@ -371,6 +416,22 @@ const todayStr = () => {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 };
+// date-only ISO (YYYY-MM-DD) -> readable local date
+const fmtDate = s => {
+  if (!s) return "—";
+  const dt = d2(String(s).slice(0, 10));
+  return isNaN(dt) ? String(s) : dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
+const CLINICS = [
+  "Lincoln Park", "Bucktown", "Wicker Park", "Wilmette",
+  "Northbrook", "Buffalo Grove", "Gurnee", "Park Ridge"
+];
+function fillClinicOptions(sel, { placeholder } = {}) {
+  sel.innerHTML =
+    (placeholder ? `<option value="" disabled selected>${placeholder}</option>` : "") +
+    CLINICS.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+}
 
 let currentData = null;
 
@@ -494,7 +555,7 @@ function render(data) {
 // ---- roster lists -------------------------------------------------------
 function matches(entry, q) {
   if (!q) return true;
-  return `${entry.code || ""} ${entry.addedBy || ""}`.toLowerCase().includes(q);
+  return `${entry.code || ""} ${entry.addedBy || ""} ${entry.clinic || ""}`.toLowerCase().includes(q);
 }
 
 // Each entry is identified by its creation timestamp (unique per click).
@@ -509,14 +570,21 @@ function signed(n, dec = 2) {
   return (v >= 0 ? "+" : "−") + fmt(Math.abs(v), dec);
 }
 
+const START_COLS = ["Code", "Hrs/day", "Clinic", "Start date", "Date added", "Added by"];
+const ADJ_COLS   = ["Code", "Change", "Date", "Added by"];
+
 function rowHtml(r, kind) {
   const removed = r.removed === true;
+  const edited = !!r.editedAt;
   const key = esc(entryKey(r, kind));
+  const nCols = (kind === "start" ? START_COLS : ADJ_COLS).length + 1;
   let cells;
   if (kind === "start") {
     cells =
       `<td><code>${esc(r.code)}</code></td>` +
       `<td>${fmt(Number(r.hours) || 0, 2)}</td>` +
+      `<td>${esc(r.clinic || "—")}</td>` +
+      `<td>${esc(fmtDate(r.startDate))}</td>` +
       `<td>${esc(fmtDateTime(r.dateAdded))}</td>` +
       `<td>${esc(r.addedBy || "—")}</td>`;
   } else {
@@ -528,13 +596,23 @@ function rowHtml(r, kind) {
       `<td>${esc(fmtDateTime(r.date))}</td>` +
       `<td>${esc(r.addedBy || "—")}</td>`;
   }
-  const action = removed
-    ? `<td></td>`
-    : `<td><button type="button" class="rm-link" data-kind="${kind}" data-key="${key}">Remove</button></td>`;
-  const note = removed
-    ? `<tr class="rm-note"><td colspan="5">↳ removed by ${esc(r.removedBy || "—")}, ${esc(fmtDateTime(r.removedAt))}</td></tr>`
-    : "";
-  return `<tr class="${removed ? "removed" : ""}">${cells}${action}</tr>${note}`;
+
+  let action = `<td></td>`;
+  if (!removed) {
+    const btns = [];
+    if (kind === "start") btns.push(`<button type="button" class="edit-link" data-key="${key}">Edit</button>`);
+    btns.push(`<button type="button" class="rm-link" data-kind="${kind}" data-key="${key}">Remove</button>`);
+    action = `<td><div class="row-actions">${btns.join("")}</div></td>`;
+  }
+
+  let notes = "";
+  if (edited) {
+    notes += `<tr class="note"><td colspan="${nCols}">✎ edited by ${esc(r.editedBy || "—")}, ${esc(fmtDateTime(r.editedAt))}</td></tr>`;
+  }
+  if (removed) {
+    notes += `<tr class="note"><td colspan="${nCols}">↳ removed by ${esc(r.removedBy || "—")}, ${esc(fmtDateTime(r.removedAt))}</td></tr>`;
+  }
+  return `<tr class="${removed ? "removed" : ""}">${cells}${action}</tr>${notes}`;
 }
 
 function renderList({ data, arrKey, kind, filterId, countId, listId, emptyMsg, dateField, headCols }) {
@@ -561,7 +639,7 @@ function renderStartsList(data) {
     data, arrKey: "newStarts", kind: "start",
     filterId: "ns-filter", countId: "ns-list-count", listId: "ns-list",
     emptyMsg: "No new client starts logged yet.", dateField: "dateAdded",
-    headCols: ["Code", "Hrs/day", "Date added", "Added by"]
+    headCols: START_COLS
   });
 }
 
@@ -570,7 +648,7 @@ function renderAdjustmentsList(data) {
     data, arrKey: "adjustments", kind: "adj",
     filterId: "adj-filter", countId: "adj-list-count", listId: "adj-list",
     emptyMsg: "No adjustments logged yet.", dateField: "date",
-    headCols: ["Code", "Change", "Date", "Added by"]
+    headCols: ADJ_COLS
   });
 }
 
@@ -626,8 +704,12 @@ async function addNewStart() {
   const msg = document.getElementById("ns-msg");
   const codeEl = document.getElementById("ns-code");
   const hoursEl = document.getElementById("ns-hours");
+  const clinicEl = document.getElementById("ns-clinic");
+  const startEl = document.getElementById("ns-startdate");
   const code = codeEl.value.trim();
   const hours = Number(hoursEl.value);
+  const clinic = clinicEl.value;
+  const startDate = startEl.value;
   const name = document.getElementById("ns-name").value.trim();
 
   if (!code) { msg.className = "save-msg err"; msg.textContent = "Enter a client code."; return; }
@@ -636,6 +718,9 @@ async function addNewStart() {
     msg.textContent = "Enter valid hours / day (greater than 0).";
     return;
   }
+  if (!CLINICS.includes(clinic)) { msg.className = "save-msg err"; msg.textContent = "Pick a clinic."; return; }
+  if (!startDate) { msg.className = "save-msg err"; msg.textContent = "Pick a start date."; return; }
+
   const dup = (currentData?.newStarts || []).find(
     e => isActive(e) && (e.code || "").toLowerCase() === code.toLowerCase()
   );
@@ -646,13 +731,19 @@ async function addNewStart() {
     next.newStarts.push({
       code,
       hours,
+      clinic,
+      startDate,
       dateAdded: new Date().toISOString(),
       addedBy: name || "anonymous"
     });
     next.lastUpdatedBy = name || "anonymous";
   }, btn, msg);
 
-  if (ok) { codeEl.value = ""; hoursEl.value = ""; codeEl.focus(); }
+  if (ok) {
+    codeEl.value = ""; hoursEl.value = "";
+    clinicEl.value = ""; startEl.value = todayStr();
+    codeEl.focus();
+  }
 }
 
 async function addAdjustment() {
@@ -749,12 +840,85 @@ async function confirmRemoval() {
   if (ok) closeRemoveModal();
 }
 
+// ---- edit (new client starts only) ----------------------------------
+let pendingEdit = null;
+
+function onListClick(e) {
+  const editBtn = e.target.closest(".edit-link");
+  if (editBtn) { openEditModal(editBtn.dataset.key); return; }
+  onRemoveClick(e);
+}
+
+function openEditModal(key) {
+  const entry = findEntry(currentData || {}, "start", key);
+  if (!entry || entry.removed === true) return;
+  pendingEdit = { key };
+
+  document.getElementById("ed-code").value = entry.code || "";
+  document.getElementById("ed-hours").value = entry.hours ?? "";
+  document.getElementById("ed-clinic").value = CLINICS.includes(entry.clinic) ? entry.clinic : "";
+  document.getElementById("ed-startdate").value = entry.startDate ? String(entry.startDate).slice(0, 10) : "";
+
+  const nameEl = document.getElementById("ed-name");
+  try { nameEl.value = localStorage.getItem(NAME_STORE) || ""; } catch (e) { nameEl.value = ""; }
+  const msg = document.getElementById("ed-msg");
+  msg.className = "save-msg";
+  msg.textContent = "";
+  document.getElementById("ed-modal").hidden = false;
+  document.getElementById("ed-code").focus();
+}
+
+function closeEditModal() {
+  pendingEdit = null;
+  document.getElementById("ed-modal").hidden = true;
+}
+
+async function saveEdit() {
+  if (!pendingEdit) return;
+  const { key } = pendingEdit;
+  const msg = document.getElementById("ed-msg");
+  const btn = document.getElementById("ed-save");
+  const code = document.getElementById("ed-code").value.trim();
+  const hours = Number(document.getElementById("ed-hours").value);
+  const clinic = document.getElementById("ed-clinic").value;
+  const startDate = document.getElementById("ed-startdate").value;
+  const name = document.getElementById("ed-name").value.trim();
+
+  if (!code) { msg.className = "save-msg err"; msg.textContent = "Enter a client code."; return; }
+  if (!Number.isFinite(hours) || hours <= 0) {
+    msg.className = "save-msg err"; msg.textContent = "Enter valid hours / day (greater than 0)."; return;
+  }
+  if (!CLINICS.includes(clinic)) { msg.className = "save-msg err"; msg.textContent = "Pick a clinic."; return; }
+  if (!startDate) { msg.className = "save-msg err"; msg.textContent = "Pick a start date."; return; }
+  if (!name) { msg.className = "save-msg err"; msg.textContent = "Enter your name to save."; return; }
+
+  rememberName(name);
+  const ok = await commit(next => {
+    const entry = findEntry(next, "start", key);
+    if (!entry) throw new Error("entry no longer exists — refresh");
+    entry.code = code;
+    entry.hours = hours;
+    entry.clinic = clinic;
+    entry.startDate = startDate;
+    entry.editedBy = name;
+    entry.editedAt = new Date().toISOString();
+    next.lastUpdatedBy = name;
+  }, btn, msg);
+
+  if (ok) closeEditModal();
+}
+
 // ---- boot -----------------------------------------------------------------
+fillClinicOptions(document.getElementById("ns-clinic"), { placeholder: "Select clinic…" });
+fillClinicOptions(document.getElementById("ed-clinic"), { placeholder: "Select clinic…" });
+document.getElementById("ns-clinic").value = "";
+document.getElementById("ns-startdate").value = todayStr();
+
 document.getElementById("ns-btn").addEventListener("click", addNewStart);
 document.getElementById("adj-btn").addEventListener("click", addAdjustment);
 document.getElementById("ns-filter").addEventListener("input", () => currentData && renderStartsList(currentData));
 document.getElementById("adj-filter").addEventListener("input", () => currentData && renderAdjustmentsList(currentData));
-document.getElementById("ns-list").addEventListener("click", onRemoveClick);
+document.getElementById("ns-list").addEventListener("click", onListClick);
 document.getElementById("adj-list").addEventListener("click", onRemoveClick);
 document.getElementById("rm-cancel").addEventListener("click", closeRemoveModal);
 document.getElementById("rm-confirm").addEventListener("click", confirmRemoval);
@@ -762,8 +926,15 @@ document.getElementById("rm-modal").addEventListener("click", e => {
   if (e.target === document.getElementById("rm-modal")) closeRemoveModal();
 });
 document.getElementById("rm-name").addEventListener("keydown", e => { if (e.key === "Enter") confirmRemoval(); });
+document.getElementById("ed-cancel").addEventListener("click", closeEditModal);
+document.getElementById("ed-save").addEventListener("click", saveEdit);
+document.getElementById("ed-modal").addEventListener("click", e => {
+  if (e.target === document.getElementById("ed-modal")) closeEditModal();
+});
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && !document.getElementById("rm-modal").hidden) closeRemoveModal();
+  if (e.key !== "Escape") return;
+  if (!document.getElementById("rm-modal").hidden) closeRemoveModal();
+  if (!document.getElementById("ed-modal").hidden) closeEditModal();
 });
 try {
   const saved = localStorage.getItem(NAME_STORE);

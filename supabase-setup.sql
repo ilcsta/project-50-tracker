@@ -40,8 +40,11 @@ insert into public.progress (id, data) values (
     'deadline',          '2026-12-31',
     'clientStarts', jsonb_build_object('goal', 50,  'atTrackingStart', 0),
     'abaHours',     jsonb_build_object('goal', 871, 'atTrackingStart', 588),
-    'newStarts',   jsonb_build_array(),   -- [{ code, hours, dateAdded, addedBy, removed?, removedBy?, removedAt? }]
-    'adjustments', jsonb_build_array(),   -- [{ code, delta, date, addedBy, removed?, removedBy?, removedAt? }]
+    -- newStarts entry: { code, hours, clinic, startDate, dateAdded, addedBy,
+    --                    editedBy?, editedAt?, removed?, removedBy?, removedAt? }
+    'newStarts',   jsonb_build_array(),
+    -- adjustments entry: { code, delta, date, addedBy, removed?, removedBy?, removedAt? }
+    'adjustments', jsonb_build_array(),
     'lastUpdatedBy', 'seed',
     'lastUpdatedAt', '2026-09-02T00:00:00Z'
   )
