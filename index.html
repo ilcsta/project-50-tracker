@@ -200,6 +200,17 @@
   .listwrap tbody tr:last-child td { border-bottom: 0; }
   .listwrap .delta-pos { color: var(--good); font-weight: 700; }
   .listwrap .delta-neg { color: var(--crit); font-weight: 700; }
+
+  .roster > summary .roster-summary-main {
+    display: flex; align-items: baseline; flex-wrap: wrap;
+    gap: 3px 14px; min-width: 0;
+  }
+  .adj-stats {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .adj-stats .stat-pos { color: var(--good); font-weight: 700; }
+  .adj-stats .stat-neg { color: var(--crit); font-weight: 700; }
   .empty { font-size: 13px; color: var(--muted); padding: 16px 14px; margin: 0; }
 
   .listwrap .row-actions { display: flex; gap: 12px; }
@@ -332,7 +343,12 @@
   </section>
 
   <details class="card roster" id="adj-roster">
-    <summary><h2>Adjustments log <span class="count" id="adj-list-count"></span></h2></summary>
+    <summary>
+      <div class="roster-summary-main">
+        <h2>Adjustments log <span class="count" id="adj-list-count"></span></h2>
+        <span class="adj-stats" id="adj-stats"></span>
+      </div>
+    </summary>
     <input type="text" class="filter" id="adj-filter" placeholder="Search by client code or name…" autocomplete="off">
     <div class="listwrap" id="adj-list"></div>
   </details>
@@ -643,6 +659,26 @@ function renderStartsList(data) {
   });
 }
 
+// Added/removed/net across active adjustments only (removed entries are excluded).
+function computeAdjStats(data) {
+  const active = (data.adjustments || []).filter(isActive);
+  let added = 0, removed = 0;
+  for (const e of active) {
+    const d = Number(e.delta) || 0;
+    if (d >= 0) added += d; else removed += -d;
+  }
+  return { added, removed, net: added - removed };
+}
+
+function renderAdjStats(data) {
+  const { added, removed, net } = computeAdjStats(data);
+  const netCls = net >= 0 ? "stat-pos" : "stat-neg";
+  document.getElementById("adj-stats").innerHTML =
+    `<span class="stat-pos">+${fmt(added, 1)}</span> added · ` +
+    `<span class="stat-neg">−${fmt(removed, 1)}</span> removed · ` +
+    `net <span class="${netCls}">${signed(net, 1)}</span>`;
+}
+
 function renderAdjustmentsList(data) {
   renderList({
     data, arrKey: "adjustments", kind: "adj",
@@ -650,6 +686,7 @@ function renderAdjustmentsList(data) {
     emptyMsg: "No adjustments logged yet.", dateField: "date",
     headCols: ADJ_COLS
   });
+  renderAdjStats(data);
 }
 
 // ---- data source: fetch + save ----------------------------------------
